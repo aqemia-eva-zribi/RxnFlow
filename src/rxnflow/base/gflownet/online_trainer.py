@@ -11,7 +11,8 @@ from rdkit import RDLogger
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard.writer import SummaryWriter
 
-import wandb
+import mlflow.client
+
 from gflownet.config import Config
 from gflownet.data.data_source import DataSource
 from gflownet.data.replay_buffer import ReplayBuffer
@@ -19,19 +20,35 @@ from gflownet.envs.graph_building_env import GraphBuildingEnv
 from gflownet.online_trainer import AvgRewardHook, StandardOnlineTrainer
 from gflownet.trainer import Closable
 from gflownet.utils.misc import set_main_process_device, set_worker_rng_seed
+from rxnflow.utils import mlflow as mlflow_utils
 
 from .sqlite_log import CustomSQLiteLogHook
 
 
 class CustomStandardOnlineTrainer(StandardOnlineTrainer):
-    def __init__(self, config: Config, print_config=True):
+    def __init__(
+        self,
+        config: Config,
+        print_config=True,
+        *,
+        mlflow_client: mlflow.client.MlflowClient | None = None,
+        mlflow_run_id: str | None = None,
+    ):
         """A GFlowNet trainer. Contains the main training loop in `run` and should be subclassed.
 
         Parameters
         ----------
         config: Config
             The hyperparameters for the trainer.
+        mlflow_client:
+            Optional MLflow client used to log metrics and parameters. When omitted,
+            the trainer runs without MLflow logging.
+        mlflow_run_id:
+            Identifier of the MLflow run to log to. Required when `mlflow_client` is
+            provided.
         """
+        self._mlflow_client = mlflow_client
+        self._mlflow_run_id = mlflow_run_id
         self.print_config = print_config
         self.to_terminate: list[Closable] = []
 
@@ -197,10 +214,15 @@ class CustomStandardOnlineTrainer(StandardOnlineTrainer):
         return self._make_data_loader(src)
 
     def log(self, info, index, key):
-        # NOTE: wandb.run log (key_k -> key/k)
+        # NOTE: MLflow log (key_k -> key/k)
         if not hasattr(self, "_summary_writer"):
             self._summary_writer = SummaryWriter(self.cfg.log_dir)
         for k, v in info.items():
             self._summary_writer.add_scalar(f"{key}_{k}", v, index)
-        if wandb.run is not None:
-            wandb.log({f"{key}/{k}": v for k, v in info.items()}, step=index)
+        if self._mlflow_client is not None and self._mlflow_run_id is not None:
+            mlflow_utils.log_metrics(
+                self._mlflow_run_id,
+                {f"{key}/{k}": v for k, v in info.items()},
+                step=index,
+                client=self._mlflow_client,
+            )

@@ -1,8 +1,10 @@
 from argparse import ArgumentParser
 
-import wandb
+import mlflow.client
+
 from rxnflow.config import Config, init_empty
 from rxnflow.tasks.multi_pocket import ProxyTrainer_MultiPocket
+from rxnflow.utils import mlflow as mlflow_utils
 
 
 def parse_args():
@@ -34,7 +36,10 @@ def parse_args():
         default=0.02,
         help="Action Subsampling Ratio. Memory-variance trade-off (Smaller ratio increase variance; default: 0.02)",
     )
-    run_cfg.add_argument("--wandb", type=str, help="wandb job name")
+    run_cfg.add_argument("--mlflow-run-name", type=str, help="MLflow run name (omit to disable MLflow logging)")
+    run_cfg.add_argument(
+        "--mlflow-experiment", type=str, default=mlflow_utils.EXPERIMENT_NAME, help="MLflow experiment name"
+    )
     run_cfg.add_argument("--debug", action="store_true", help="For debugging option")
     return parser.parse_args()
 
@@ -78,12 +83,21 @@ def run(args):
     if args.debug:
         config.overwrite_existing_exp = True
         config.print_every = 1
-    if args.wandb:
-        wandb.init(project="rxnflow", name=args.wandb, group="pocket-conditional")
 
-    trainer = ProxyTrainer_MultiPocket(config)
-    trainer.run()
-    trainer.terminate()
+    if args.mlflow_run_name is not None:
+        client = mlflow.client.MlflowClient(tracking_uri=mlflow_utils.MLFLOW_TRACKING_URI)
+        exp = client.get_experiment_by_name(args.mlflow_experiment)
+        exp_id = exp.experiment_id if exp is not None else client.create_experiment(args.mlflow_experiment)
+        with mlflow_utils.start_mlflow_run(
+            args.mlflow_run_name, group="pocket-conditional", exp_id=exp_id, client=client
+        ) as run:
+            trainer = ProxyTrainer_MultiPocket(config, mlflow_client=client, mlflow_run_id=run.info.run_id)
+            trainer.run()
+            trainer.terminate()
+    else:
+        trainer = ProxyTrainer_MultiPocket(config)
+        trainer.run()
+        trainer.terminate()
 
 
 if __name__ == "__main__":

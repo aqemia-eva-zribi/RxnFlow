@@ -6,13 +6,13 @@ import torch
 import torch_geometric.data as gd
 from omegaconf import OmegaConf
 
-import wandb
 from gflownet.algo.config import Backward
 from gflownet.utils.multiobjective_hooks import MultiObjectiveStatsHook
 from rxnflow.algo.trajectory_balance import SynthesisTB
 from rxnflow.config import Config
 from rxnflow.envs import SynthesisEnv, SynthesisEnvContext
 from rxnflow.models.gfn import RxnFlow
+from rxnflow.utils import mlflow as mlflow_utils
 from rxnflow.utils.misc import set_worker_env
 
 from .gflownet.online_trainer import CustomStandardOnlineTrainer
@@ -134,15 +134,17 @@ class RxnFlowTrainer(CustomStandardOnlineTrainer):
         del state
 
     def run(self, logger=None):
-        if wandb.run is not None:
-            wandb.config.update({"config": OmegaConf.to_container(self.cfg)})
+        if self._mlflow_client is not None and self._mlflow_run_id is not None:
+            mlflow_utils.log_params(
+                self._mlflow_run_id,
+                {"config": OmegaConf.to_container(self.cfg)},
+                client=self._mlflow_client,
+            )
         super().run(logger)
 
     def terminate(self):
         super().terminate()
         self.env.retro_analyzer.terminate()
-        if wandb.run is not None:
-            wandb.finish()
 
     # MOO setting
     def train_batch(self, batch: gd.Batch, epoch_idx: int, batch_idx: int, train_it: int) -> dict[str, Any]:

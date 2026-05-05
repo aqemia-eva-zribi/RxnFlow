@@ -11,7 +11,6 @@ import torch
 import torch.nn as nn
 import torch.utils.tensorboard
 import torch_geometric.data as gd
-import wandb
 from omegaconf import OmegaConf
 from rdkit import RDLogger
 from torch import Tensor
@@ -26,6 +25,10 @@ from gflownet.utils.misc import create_logger, set_main_process_device, set_work
 from gflownet.utils.multiprocessing_proxy import mp_object_wrapper
 from gflownet.utils.sqlite_log import SQLiteLogHook
 
+import mlflow.client
+
+from rxnflow.utils import mlflow as mlflow_utils
+
 from .config import Config
 
 
@@ -35,14 +38,29 @@ class Closable(Protocol):
 
 
 class GFNTrainer:
-    def __init__(self, config: Config, print_config=True):
+    def __init__(
+        self,
+        config: Config,
+        print_config=True,
+        *,
+        mlflow_client: mlflow.client.MlflowClient | None = None,
+        mlflow_run_id: str | None = None,
+    ):
         """A GFlowNet trainer. Contains the main training loop in `run` and should be subclassed.
 
         Parameters
         ----------
         config: Config
             The hyperparameters for the trainer.
+        mlflow_client:
+            Optional MLflow client used to log metrics and parameters. When omitted,
+            the trainer runs without MLflow logging (TensorBoard logging is unaffected).
+        mlflow_run_id:
+            Identifier of the MLflow run to log to. Required when `mlflow_client` is
+            provided.
         """
+        self._mlflow_client = mlflow_client
+        self._mlflow_run_id = mlflow_run_id
         self.print_config = print_config
         self.to_terminate: List[Closable] = []
         # self.setup should at least set these up:
@@ -365,8 +383,13 @@ class GFNTrainer:
             self._summary_writer = torch.utils.tensorboard.SummaryWriter(self.cfg.log_dir)
         for k, v in info.items():
             self._summary_writer.add_scalar(f"{key}_{k}", v, index)
-        if wandb.run is not None:
-            wandb.log({f"{key}_{k}": v for k, v in info.items()}, step=index)
+        if self._mlflow_client is not None and self._mlflow_run_id is not None:
+            mlflow_utils.log_metrics(
+                self._mlflow_run_id,
+                {f"{key}_{k}": v for k, v in info.items()},
+                step=index,
+                client=self._mlflow_client,
+            )
 
     def __del__(self):
         self.terminate()

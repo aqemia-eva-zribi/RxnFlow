@@ -18,7 +18,6 @@ dependencies = [
     "numpy==1.26.4",
     "rdkit>=2023.9.6",
     "omegaconf>=2.3",
-    "wandb",
     "tensorboard",
     "gitpython",
     "botorch",
