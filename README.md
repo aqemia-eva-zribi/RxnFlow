@@ -22,7 +22,7 @@ We will release our **in-house model architecture** used in Hyper Screening X so
 
 ## Setup
 
-### Installation
+### Old Installation
 
 ```bash
 # python>=3.12,<3.13
@@ -37,6 +37,11 @@ pip install -e '.[pmnet]' --find-links https://data.pyg.org/whl/torch-2.5.1+cu12
 
 # Install all dependencies
 pip install -e '.[unidock,pmnet,dev]' --find-links https://data.pyg.org/whl/torch-2.5.1+cu121.html
+```
+### New installation with uv
+```bash
+# with Pytorch 2.8 + cu126
+ uv sync --extra cu126
 ```
 
 ### Data Preparation

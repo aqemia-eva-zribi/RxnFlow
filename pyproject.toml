@@ -13,20 +13,16 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 keywords = ["gflownet"]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "numpy==1.26.4",
-    "torch==2.5.1",
-    "torch-geometric>=2.4.0",
-    "torch-scatter>=2.1.2",
-    "torch-sparse>=0.6.18",
-    "torch-cluster>=1.6.3",
     "rdkit>=2023.9.6",
     "omegaconf>=2.3",
     "wandb",
     "tensorboard",
     "gitpython",
     "botorch",
+    "mlflow>=3.4.0",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +41,18 @@ dev = [
 # TODO: finish benchmark setting
 # synbench = ["synbench @ git+https://github.com/SeonghwanSeo/SynBench.git@init"]
 
+cu126 = [
+    "torch == 2.8.0",
+    "torch @ https://download.pytorch.org/whl/cu126/torch-2.8.0%2Bcu126-cp311-cp311-manylinux_2_28_x86_64.whl ; python_version == '3.11' and platform_machine == 'x86_64' and platform_system == 'Linux'",
+    "einops>=0.8.0",
+    "jaxtyping>=0.2.34",
+    "torch_geometric>=2.6.1",
+    "torch_scatter @ https://data.pyg.org/whl/torch-2.8.0%2Bcu126/torch_scatter-2.1.2%2Bpt28cu126-cp311-cp311-linux_x86_64.whl ; python_version == '3.11' and platform_machine == 'x86_64' and platform_system == 'Linux'",
+    "torch_sparse  @ https://data.pyg.org/whl/torch-2.8.0%2Bcu126/torch_sparse-0.6.18%2Bpt28cu126-cp311-cp311-linux_x86_64.whl  ; python_version == '3.11' and platform_machine == 'x86_64' and platform_system == 'Linux'",
+    "torch_cluster @ https://data.pyg.org/whl/torch-2.8.0%2Bcu126/torch_cluster-1.6.3%2Bpt28cu126-cp311-cp311-linux_x86_64.whl ; python_version == '3.11' and platform_machine == 'x86_64' and platform_system == 'Linux'",
+]
+
+
 [tool.black]
 line-length = 120
 target-version = ["py312"]
@@ -57,3 +65,8 @@ select = ["E", "F", "B", "UP", "T203", "I"]
 ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "E402"]
+
+
+
+
+
