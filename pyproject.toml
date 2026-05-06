@@ -22,6 +22,9 @@ dependencies = [
     "gitpython",
     "botorch",
     "mlflow>=3.4.0",
+    "biopython>=1.87",
+    "awswrangler",
+    "ipykernel",
 ]
 
 [project.optional-dependencies]
