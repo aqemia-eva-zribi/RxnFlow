@@ -59,6 +59,8 @@ class RxnActionCategorical(GraphActionCategorical):
             num_actions = len(subsample_idcs)
             if num_actions == 0:
                 logits = neginf((self.num_graphs, 1), device=self.dev)
+                if protocol_mask.any() and num_actions == 0:
+                    print("(DEBUG) MASK TRUE BUT ZERO ACTIONS SO LOGITS = - INF", protocol.name, protocol_mask.nonzero().flatten().tolist())
             elif protocol_mask.all():
                 # calculate logit then perform logit-scaling (Logit-GFN)
                 logits = self.model_hook(protocol, self.emb, subsample_idcs)

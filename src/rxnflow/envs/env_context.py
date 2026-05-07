@@ -187,17 +187,40 @@ class SynthesisEnvContext(GraphBuildingEnvContext):
         obj = g.mol
         masks = torch.zeros((self.num_protocols,), dtype=torch.bool)
         possible_protocols: list[Protocol] = []
+
+        # Debug metrics
+        g.graph["zero_action_protocol_count"] = 0
+        g.graph["forced_stop"] = False
+
         if obj.GetNumAtoms() == 0:
             possible_protocols += self.firstblock_list
         else:
             if g.graph["allow_stop"]:
+                # print("(DEUG) ZERO-ACTION PROTOCOL", g.smi, protocol.name)
                 possible_protocols += self.stop_list
             for protocol in self.unirxn_list:
                 if protocol.rxn.is_reactant(obj):
                     possible_protocols.append(protocol)
+            # If the current molecule is compatible with the BiReaction
+            # But there are no compatible reactant after that, we don't select the protocol
             for protocol in self.birxn_list:
-                if protocol.rxn.is_reactant(obj, 0):
-                    possible_protocols.append(protocol)
+                if not protocol.rxn.is_reactant(obj, 0):
+                    continue
+                if len(self.birxn_block_indices[protocol.name]) == 0:
+                    # ZERO-ACTION-PROTOCOL: no reactant comptatible
+                    g.graph["zero_action_protocol_count"] += 1
+                    continue
+                possible_protocols.append(protocol)
+
+            # Fallback: if the molecule cannot react further AND min_len has not
+            # been reached, allow STOP anyway. Without this, every protocol gets
+            # masked to -inf, softmax produces NaN, and training crashes with
+            # `loss is not finite`. Trades a slightly-too-short trajectory for a
+            # finite loss — the agent will learn to avoid these states via reward.
+            if not possible_protocols:
+                possible_protocols += self.stop_list
+                # print("(DEBUG) Forced stop because no possible action before min length")
+                g.graph["forced_stop"] = True
         for protocol in possible_protocols:
             masks[self.protocol_to_idx[protocol.name]] = True
         return masks

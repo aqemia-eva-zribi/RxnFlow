@@ -62,6 +62,22 @@ class SynthesisTB(CustomTB):
                 for i in trajs
             ]
         )
+        # to track debug metrics
+        batch.zero_action_protocol_count = torch.tensor(
+            [
+                sum(g.graph.get("zero_action_protocol_count", 0) for g, _ in traj["traj"])
+                for traj in trajs
+            ],
+            dtype=torch.float,
+        )
+
+        batch.forced_stop_count = torch.tensor(
+            [
+                sum(int(g.graph.get("forced_stop", False)) for g, _ in traj["traj"])
+                for traj in trajs
+            ],
+            dtype=torch.float,
+        )
         return batch
 
     def compute_batch_losses(
@@ -72,4 +88,9 @@ class SynthesisTB(CustomTB):
     ):
         loss, info = super().compute_batch_losses(model, batch, num_bootstrap)
         info["num_rxns"] = batch.num_rxns.float().mean()
+        # add debug metrics informations
+        info["zero_action_protocol_count"] = batch.zero_action_protocol_count.mean()
+        info["zero_action_protocol_total"] = batch.zero_action_protocol_count.sum()
+        info["forced_stop_count"] = batch.forced_stop_count.sum()
+        info["forced_stop_frac"] = (batch.forced_stop_count > 0).float().mean()
         return loss, info
